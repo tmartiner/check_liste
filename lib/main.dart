@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -32,11 +34,36 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<_CheckListItem> _items = [];
   final TextEditingController _controller = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? itemsString = prefs.getString('checklist_items');
+    if (itemsString != null) {
+      final List<dynamic> itemsJson = jsonDecode(itemsString);
+      setState(() {
+        _items.clear();
+        _items.addAll(itemsJson.map((item) => _CheckListItem.fromJson(item)).toList());
+      });
+    }
+  }
+
+  Future<void> _saveItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String itemsString = jsonEncode(_items);
+    await prefs.setString('checklist_items', itemsString);
+  }
+
   void _addItem() {
     setState(() {
       if (_controller.text.isNotEmpty) {
         _items.add(_CheckListItem(text: _controller.text, isChecked: false));
         _controller.clear();
+        _saveItems();
       }
     });
   }
@@ -44,12 +71,14 @@ class _MyHomePageState extends State<MyHomePage> {
   void _removeItem(int index) {
     setState(() {
       _items.removeAt(index);
+      _saveItems();
     });
   }
 
   void _toggleCheck(int index) {
     setState(() {
       _items[index].isChecked = !_items[index].isChecked;
+      _saveItems();
     });
   }
 
@@ -112,6 +141,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class _CheckListItem {
   _CheckListItem({required this.text, this.isChecked = false});
+
   String text;
   bool isChecked;
+
+  Map<String, dynamic> toJson() => {
+    'text': text,
+    'isChecked': isChecked,
+  };
+
+  static _CheckListItem fromJson(Map<String, dynamic> json) => _CheckListItem(
+    text: json['text'],
+    isChecked: json['isChecked'],
+  );
 }
